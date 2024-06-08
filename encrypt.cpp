@@ -2,6 +2,7 @@
 
 using namespace std;
 
+//S-box data
 unsigned char sBox[256] =
 {
 	0x63, 0x7C, 0x77, 0x7B, 0xF2, 0x6B, 0x6F, 0xC5, 0x30, 0x01, 0x67, 0x2B, 0xFE, 0xD7, 0xAB, 0x76,
@@ -23,6 +24,7 @@ unsigned char sBox[256] =
 };
 
 
+//Add Round key operation
 void AddRoundKey(unsigned char primaryText[4][4],unsigned char key[4][4]){
     for (int i = 0; i < 4;i++){
         for (int j = 0; j < 4;j++){
@@ -32,6 +34,7 @@ void AddRoundKey(unsigned char primaryText[4][4],unsigned char key[4][4]){
 
 }
 
+//Sub Bytes operation
 void SubBytes(unsigned char primaryText[4][4]){
     for (int i = 0; i < 4;i++){
         for (int j = 0; j < 4;j++){
@@ -41,12 +44,14 @@ void SubBytes(unsigned char primaryText[4][4]){
 
 }
 
+//Shift Rows
 void ShiftRows(unsigned char primaryText[4][4]){
     unsigned char shift[4][4];
 
     for (int i = 0; i < 4;i++){
         for (int j = 0; j < 4;j++){
-            shift[i][j] = primaryText[i][(j+i)%4];
+            shift[i][j] = primaryText[i][(j+i)%4]; // The value in (i,j) would be the value in the original matrix
+                                                    // which after left shifting by i would land on (i,j)
         }
     }
 
@@ -58,6 +63,7 @@ void ShiftRows(unsigned char primaryText[4][4]){
 
 }
 
+//Mix Column Operation
 void MixColumns(unsigned char primaryText[4][4]){
     unsigned char mul[4][4];
 
@@ -67,14 +73,22 @@ void MixColumns(unsigned char primaryText[4][4]){
             col[j] = primaryText[j][i];
         }
         unsigned char Times_2[4];
-        unsigned char overflow;
+        unsigned char overflow = 0x00;
 
         for (int j = 0; j < 4;j++){
-            overflow = col[j] >> 7;
-            Times_2[j] = col[j] << 1;
-            Times_2[j] = Times_2[j] ^ (overflow * 0x1b);
+            if (col[j] >> 7){//The integer will overflow iff the 8th bit of the number is set
+                overflow = 0x01;//If the bit is set, set the overflow flag to 1
+            }
+            Times_2[j] = col[j] << 1;//Multiplying the number by 2
+            Times_2[j] = Times_2[j] ^ (overflow * 0x1b);//Taking modulo x**8 + x** 4 + x**3 + x + 1
         }
-
+        
+        /* The mix column operation involves the multiplication of 
+        each column by a matrix*/
+        /* The values of the matrix can be derived by multiplying 
+        the polynomial 3x^3 + x^2 + x + 2 by the polynomial represented
+        by a column modulo (x^4 + 1) */
+        //Over GF(2**8), x^i mod (x^4 + 1) = x^(i mod 4)
         mul[0][i] = Times_2[0] ^ col[3] ^ col[2] ^ (Times_2[1] ^ col[1]);   
         mul[1][i] = (Times_2[2] ^ col[2]) ^ Times_2[1] ^ col[0] ^ col[3];
         mul[2][i] = (Times_2[3] ^ col[3]) ^ Times_2[2] ^ col[0] ^ col[1];
@@ -88,11 +102,19 @@ void MixColumns(unsigned char primaryText[4][4]){
     }
 }
 
+//Round function
 void Round(unsigned char primaryText[4][4],unsigned char key[4][4]){
     SubBytes(primaryText);
     ShiftRows(primaryText);
     MixColumns(primaryText);
     AddRoundKey(primaryText,key);
+}
+
+//Round function for the last round without the mix columns operation
+void LastRound(unsigned char primaryText[4][4],unsigned char key[4][4]){
+    SubBytes(primaryText);
+    ShiftRows(primaryText);
+    AddRoundKey(primaryText,key);  
 }
 
 
@@ -124,6 +146,7 @@ char IntToHexa(int number){
     }
 }
 
+//Converting array of bytes into array of hexadecimals
 char* ByteArrayToHexaArray(unsigned char* byte, char* hexa){
     for (int i = 0; i < 16;i++){
         int number = byte[i];
@@ -140,6 +163,7 @@ char* ByteArrayToHexaArray(unsigned char* byte, char* hexa){
     }
 }
 
+//Converting array of hexadecimals to array of bytes
 void HexaArrayToByteArray(unsigned char* byte, char* hexa){
     for (int i = 0; i < 16;i++){
         int first = HexaToInt(hexa[2*i]);
@@ -148,6 +172,7 @@ void HexaArrayToByteArray(unsigned char* byte, char* hexa){
     }
 }
 
+//Converting the 16 sized array into the 4 by 4 matrix
 void ByteArrayToByteMatrix(unsigned char matrix[4][4],unsigned char* byte){
     int ind = 0;
     for (int i = 0; i < 4;i++){
@@ -157,6 +182,7 @@ void ByteArrayToByteMatrix(unsigned char matrix[4][4],unsigned char* byte){
     }
 }
 
+//Converting the 4 by 4 matrix back to the array
 void ByteMatrixToByteArray(unsigned char matrix[4][4],unsigned char* byte){
     int ind = 0;
     for (int i = 0; i < 4;i++){
@@ -185,7 +211,13 @@ int main(){
     HexaArrayToByteArray(key, hexaKey);
     ByteArrayToByteMatrix(keyMatrix,key);
 
-    
+    AddRoundKey(primaryMatrix,keyMatrix);
+    SubBytes(primaryMatrix);
+    ShiftRows(primaryMatrix);
+    MixColumns(primaryMatrix);
+
+
+
 
     ByteMatrixToByteArray(primaryMatrix,primaryText);
     ByteArrayToHexaArray(primaryText,hexaPrimary);
