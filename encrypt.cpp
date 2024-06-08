@@ -23,6 +23,10 @@ unsigned char sBox[256] =
 	0x8C, 0xA1, 0x89, 0x0D, 0xBF, 0xE6, 0x42, 0x68, 0x41, 0x99, 0x2D, 0x0F, 0xB0, 0x54, 0xBB, 0x16
 };
 
+unsigned char rc[10] = {
+    0x01,0x02,0x04,0x08,0x10,0x20,0x40,0x80,0x1B,0x36
+};
+
 
 //Add Round key operation
 void AddRoundKey(unsigned char primaryText[4][4],unsigned char key[4][4]){
@@ -67,40 +71,44 @@ void ShiftRows(unsigned char primaryText[4][4]){
 void MixColumns(unsigned char primaryText[4][4]){
     unsigned char mul[4][4];
 
-    for (int i = 0; i < 4;i++){
+    for (int i = 0; i < 4; i++){
         unsigned char col[4];
-        for (int j = 0; j < 4;j++){
+        for (int j = 0; j < 4; j++){
             col[j] = primaryText[j][i];
         }
-        unsigned char Times_2[4];
-        unsigned char overflow = 0x00;
 
-        for (int j = 0; j < 4;j++){
-            if (col[j] >> 7){//The integer will overflow iff the 8th bit of the number is set
-                overflow = 0x01;//If the bit is set, set the overflow flag to 1
+        unsigned char Times_2[4];
+        for (int j = 0; j < 4; j++){
+            if (col[j] & 0x80) { // If the highest bit is set, it will overflow
+                Times_2[j] = (col[j] << 1) ^ 0x1b; // Left shift and XOR with 0x1b(Taking modulo x**8 + x** 4 + x**3 + x + 1)
+            } else {
+                Times_2[j] = col[j] << 1; // Just left shift
             }
-            Times_2[j] = col[j] << 1;//Multiplying the number by 2
-            Times_2[j] = Times_2[j] ^ (overflow * 0x1b);//Taking modulo x**8 + x** 4 + x**3 + x + 1
         }
-        
+
+        unsigned char Times_3[4];
+        for (int j = 0; j < 4; j++){
+            Times_3[j] = Times_2[j] ^ col[j]; // Multiplying by 3 is equivalent to (2 * value) ^ value
+        }
         /* The mix column operation involves the multiplication of 
         each column by a matrix*/
         /* The values of the matrix can be derived by multiplying 
         the polynomial 3x^3 + x^2 + x + 2 by the polynomial represented
         by a column modulo (x^4 + 1) */
         //Over GF(2**8), x^i mod (x^4 + 1) = x^(i mod 4)
-        mul[0][i] = Times_2[0] ^ col[3] ^ col[2] ^ (Times_2[1] ^ col[1]);   
-        mul[1][i] = (Times_2[2] ^ col[2]) ^ Times_2[1] ^ col[0] ^ col[3];
-        mul[2][i] = (Times_2[3] ^ col[3]) ^ Times_2[2] ^ col[0] ^ col[1];
-        mul[3][i] = (Times_2[0] ^ col[0]) ^ Times_2[3] ^ col[1] ^ col[2];
+        mul[0][i] = Times_2[0] ^ Times_3[1] ^ col[2] ^ col[3];
+        mul[1][i] = col[0] ^ Times_2[1] ^ Times_3[2] ^ col[3];
+        mul[2][i] = col[0] ^ col[1] ^ Times_2[2] ^ Times_3[3];
+        mul[3][i] = Times_3[0] ^ col[1] ^ col[2] ^ Times_2[3];
     }
 
-    for (int i = 0; i < 4;i++){
-        for (int j = 0; j < 4;j++){
+    for (int i = 0; i < 4; i++){
+        for (int j = 0; j < 4; j++){
             primaryText[j][i] = mul[j][i];
         }
     }
 }
+
 
 //Round function
 void Round(unsigned char primaryText[4][4],unsigned char key[4][4]){
@@ -192,8 +200,53 @@ void ByteMatrixToByteArray(unsigned char matrix[4][4],unsigned char* byte){
     }
 }
 
+void KeyExpansion(unsigned char expandedKeys[11][4][4]) {
+    for (int round = 1; round <= 10; round++) {
+        unsigned char col[4];
+
+        // Get the last column from the previous round key
+        for (int i = 0; i < 4; i++) {
+            col[i] = expandedKeys[round - 1][i][3];
+        }
+
+        // Perform the key schedule core (rotWord and subWord)
+        unsigned char temp = col[0];
+        for (int i = 0; i < 3; i++) {
+            col[i] = col[i + 1];
+        }
+        col[3] = temp;
+
+        for (int i = 0; i < 4; i++) {
+            col[i] = sBox[col[i]];
+        }
+
+        col[0] ^= rc[round - 1];
+
+        // Compute the first column of the new round key
+        for (int i = 0; i < 4; i++) {
+            expandedKeys[round][i][0] = expandedKeys[round - 1][i][0] ^ col[i];
+        }
+
+        // Compute the rest of the columns of the new round key
+        for (int j = 1; j < 4; j++) {
+            for (int i = 0; i < 4; i++) {
+                expandedKeys[round][i][j] = expandedKeys[round][i][j - 1] ^ expandedKeys[round - 1][i][j];
+            }
+        }
+    }
+}
 
 
+
+void AESEncryption(unsigned char primaryMatrix[4][4], unsigned char expandedKeys[11][4][4]){
+    AddRoundKey(primaryMatrix,expandedKeys[0]);
+
+    for (int i = 1; i <= 9;i++){
+        Round(primaryMatrix,expandedKeys[i]);
+    }
+
+    LastRound(primaryMatrix,expandedKeys[10]);
+}
 
 
 
@@ -212,7 +265,7 @@ int main(){
 
     HexaArrayToByteArray(key, hexaKey);
     ByteArrayToByteMatrix(keyMatrix,key);
-    AddRoundKey(primaryMatrix,keyMatrix);
+    
     unsigned char expandedKeys[11][4][4];
 
     for (int i = 0; i < 4;i++){
@@ -221,55 +274,9 @@ int main(){
         }
     }
 
-    unsigned char col[4];
+    KeyExpansion(expandedKeys);
 
-    for (int i = 0; i < 4;i++){
-        col[i] = keyMatrix[i][3];
-    }
-
-    unsigned char shift[4];
-    for (int i = 0; i < 4;i++){
-        
-        shift[i] = col[(i+1)%4];
-
-    }
-
-    for (int i = 0; i < 4;i++){
-        col[i] = shift[i];
-    }
-
-
-    for (int i = 0; i < 4;i++){
-        col[i] = sBox[col[i]];
-    }
-
-    col[0] = col[0] ^ 0x01;
-
-    for (int i = 0; i < 4;i++){
-        for (int j = 0; j < 4;j++){
-            if (i == 0){
-                expandedKeys[1][j][i] = expandedKeys[0][j][i] ^ col[j];
-            }
-            else{
-                expandedKeys[1][j][i] = expandedKeys[0][j][i] ^ expandedKeys[1][j][i-1];
-            }
-        }
-    }
-
-    Round(primaryMatrix,expandedKeys[1]);
-
-
-
-
-
-
-
-
-
-
-
-
-
+    AESEncryption(primaryMatrix,expandedKeys);
 
     ByteMatrixToByteArray(primaryMatrix,primaryText);
     ByteArrayToHexaArray(primaryText,hexaPrimary);
@@ -277,13 +284,6 @@ int main(){
     for (int i = 0; i < 32;i++){
         cout << hexaPrimary[i] ;
     }
-
-    
-
-    
-
-    
-
 
     return 0;
 }
