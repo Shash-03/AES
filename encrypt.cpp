@@ -23,7 +23,6 @@ unsigned char sBox[256] =
 };
 
 
-
 void AddRoundKey(unsigned char primaryText[4][4],unsigned char key[4][4]){
     for (int i = 0; i < 4;i++){
         for (int j = 0; j < 4;j++){
@@ -59,8 +58,41 @@ void ShiftRows(unsigned char primaryText[4][4]){
 
 }
 
-void MixColumns(){
+void MixColumns(unsigned char primaryText[4][4]){
+    unsigned char mul[4][4];
 
+    for (int i = 0; i < 4;i++){
+        unsigned char col[4];
+        for (int j = 0; j < 4;j++){
+            col[j] = primaryText[j][i];
+        }
+        unsigned char Times_2[4];
+        unsigned char overflow;
+
+        for (int j = 0; j < 4;j++){
+            overflow = col[j] >> 7;
+            Times_2[j] = col[j] << 1;
+            Times_2[j] = Times_2[j] ^ (overflow * 0x1b);
+        }
+
+        mul[0][i] = Times_2[0] ^ col[3] ^ col[2] ^ (Times_2[1] ^ col[1]);   
+        mul[1][i] = (Times_2[2] ^ col[2]) ^ Times_2[1] ^ col[0] ^ col[3];
+        mul[2][i] = (Times_2[3] ^ col[3]) ^ Times_2[2] ^ col[0] ^ col[1];
+        mul[3][i] = (Times_2[0] ^ col[0]) ^ Times_2[3] ^ col[1] ^ col[2];
+    }
+
+    for (int i = 0; i < 4;i++){
+        for (int j = 0; j < 4;j++){
+            primaryText[j][i] = mul[j][i];
+        }
+    }
+}
+
+void Round(unsigned char primaryText[4][4],unsigned char key[4][4]){
+    SubBytes(primaryText);
+    ShiftRows(primaryText);
+    MixColumns(primaryText);
+    AddRoundKey(primaryText,key);
 }
 
 
@@ -153,10 +185,7 @@ int main(){
     HexaArrayToByteArray(key, hexaKey);
     ByteArrayToByteMatrix(keyMatrix,key);
 
-    AddRoundKey(primaryMatrix,keyMatrix);
-    SubBytes(primaryMatrix);
-    ShiftRows(primaryMatrix);
-
+    
 
     ByteMatrixToByteArray(primaryMatrix,primaryText);
     ByteArrayToHexaArray(primaryText,hexaPrimary);
@@ -164,6 +193,8 @@ int main(){
     for (int i = 0; i < 32;i++){
         cout << hexaPrimary[i] ;
     }
+
+    
 
     
 
