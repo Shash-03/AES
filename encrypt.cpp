@@ -195,6 +195,8 @@ void ByteMatrixToByteArray(unsigned char matrix[4][4],unsigned char* byte){
 
 
 
+
+
 int main(){
 
     unsigned char primaryText[16];
@@ -210,11 +212,61 @@ int main(){
 
     HexaArrayToByteArray(key, hexaKey);
     ByteArrayToByteMatrix(keyMatrix,key);
-
     AddRoundKey(primaryMatrix,keyMatrix);
-    SubBytes(primaryMatrix);
-    ShiftRows(primaryMatrix);
-    MixColumns(primaryMatrix);
+    unsigned char expandedKeys[11][4][4];
+
+    for (int i = 0; i < 4;i++){
+        for (int j = 0; j < 4;j++){
+            expandedKeys[0][i][j] = keyMatrix[i][j];
+        }
+    }
+
+    unsigned char col[4];
+
+    for (int i = 0; i < 4;i++){
+        col[i] = keyMatrix[i][3];
+    }
+
+    unsigned char shift[4];
+    for (int i = 0; i < 4;i++){
+        
+        shift[i] = col[(i+1)%4];
+
+    }
+
+    for (int i = 0; i < 4;i++){
+        col[i] = shift[i];
+    }
+
+
+    for (int i = 0; i < 4;i++){
+        col[i] = sBox[col[i]];
+    }
+
+    col[0] = col[0] ^ 0x01;
+
+    for (int i = 0; i < 4;i++){
+        for (int j = 0; j < 4;j++){
+            if (i == 0){
+                expandedKeys[1][j][i] = expandedKeys[0][j][i] ^ col[j];
+            }
+            else{
+                expandedKeys[1][j][i] = expandedKeys[0][j][i] ^ expandedKeys[1][j][i-1];
+            }
+        }
+    }
+
+    Round(primaryMatrix,expandedKeys[1]);
+
+
+
+
+
+
+
+
+
+
 
 
 
