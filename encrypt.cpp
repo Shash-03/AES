@@ -103,7 +103,7 @@ void LastRound(unsigned char primaryText[4][4],unsigned char key[4][4]){
     AddRoundKey(primaryText,key);  
 }
 
-void KeyExpansion(unsigned char expandedKeys[11][4][4]) {
+void KeyExpansion128(unsigned char expandedKeys[11][4][4]) {
     for (int round = 1; round <= 10; round++) {
         unsigned char col[4];
 
@@ -141,7 +141,7 @@ void KeyExpansion(unsigned char expandedKeys[11][4][4]) {
 
 
 
-void AESEncryption(unsigned char primaryMatrix[4][4], unsigned char expandedKeys[11][4][4]){
+void AESEncryption128(unsigned char primaryMatrix[4][4], unsigned char expandedKeys[11][4][4]){
     AddRoundKey(primaryMatrix,expandedKeys[0]);
 
     for (int i = 1; i <= 9;i++){
@@ -177,18 +177,26 @@ int main(){
         }
     }
 
-    KeyExpansion(expandedKeys);
+    KeyExpansion128(expandedKeys);
 
-    AESEncryption(primaryMatrix,expandedKeys);
+    AESEncryption128(primaryMatrix,expandedKeys);
 
     ByteMatrixToByteArray(primaryMatrix,primaryText);
     ByteArrayToHexaArray(primaryText,hexaPrimary);
 
+    ByteMatrixToByteArray(expandedKeys[9],key);
+    ByteArrayToHexaArray(key,hexaKey);
+
     for (int i = 0; i < 32;i++){
         cout << hexaPrimary[i] ;
     }
+    
 
     cout << "\n";
+
+    for (int i = 0; i < 32;i++){
+        cout << hexaKey[i];
+    }
 
     return 0;
 }

@@ -3,6 +3,7 @@
 
 extern unsigned char sBox[256];
 extern unsigned char rc[10];
+extern unsigned char inverseSBox[256];
 
 int HexaToInt(char hexa);
 
