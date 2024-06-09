@@ -15,11 +15,6 @@ void HexaArrayToByteArray(unsigned char* byte, char* hexa);
 
 void ByteArrayToByteMatrix(unsigned char matrix[4][4],unsigned char* byte);
 
-
 void ByteMatrixToByteArray(unsigned char matrix[4][4],unsigned char* byte);
-
-
-
-
 
 #endif
