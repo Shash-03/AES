@@ -223,114 +223,176 @@ public:
     }
 };
 
-void KeyConversion(unsigned char expandedKey[9][4][6],unsigned char finalKey[13][4][4]){
-    for (int key = 0; key < 13;key++){
-        for (int j = 0; j < 4;j++){
-            int num = key * 4 + j;
-            int row = num/6;
-            int col = num % 6;
+class AES192_Encryption {
+private:
+    char hexaPrimary[33];
+    char hexaKey[49];
+
+public:
+    
+    AES192_Encryption(const char* primary,const char* key) {
+        setHexaPrimary(primary);
+        setHexaKey(key);
+    }
+
+    
+    char* getHexaPrimary() {
+        return hexaPrimary;
+    }
+
+   
+    void setHexaPrimary(const char* value) {
+        strncpy(hexaPrimary, value, 32);
+        hexaPrimary[32] = '\0'; 
+    }
+
+    char* getHexaKey() {
+        return hexaKey;
+    }
+
+   
+    void setHexaKey(const char* value) {
+        strncpy(hexaKey, value, 48);
+        hexaKey[48] = '\0';
+    }
+
+    void KeyExpansion192(unsigned char expandedKey[9][4][6],unsigned char keyMatrix[4][6]){
+        for (int j = 0; j < 6;j++){
             for (int i = 0; i < 4;i++){
-                finalKey[key][i][j] = expandedKey[row][i][col];
+                expandedKey[0][i][j] = keyMatrix[i][j];
+            }
+        }
+
+        for (int round = 1; round <= 8; round++){
+            unsigned char col[4];
+
+            for (int i = 0; i < 4;i++){
+                col[i] = expandedKey[round - 1][i][5];
+            }
+
+            unsigned char temp = col[0];
+
+            for (int i = 0; i < 3;i++){
+                col[i] = col[i+1];
+            }
+
+            col[3] = temp;
+
+            for (int i = 0; i < 4;i++){
+                col[i] = sBox[col[i]];
+            }
+
+            col[0] = col[0] ^ rc[round - 1];
+
+            for (int i = 0; i < 4;i++){
+                expandedKey[round][i][0] = expandedKey[round-1][i][0] ^ col[i];
+            }
+
+            for (int j = 1; j < 6;j++){
+                for (int i = 0; i < 4;i++){
+                    expandedKey[round][i][j] = expandedKey[round][i][j-1] ^ expandedKey[round - 1][i][j];
+                }
             }
         }
 
     }
-}
 
-void KeyExpansion192(unsigned char expandedKey[9][4][6],unsigned char keyMatrix[4][6]){
-    for (int j = 0; j < 6;j++){
-        for (int i = 0; i < 4;i++){
-            expandedKey[0][i][j] = keyMatrix[i][j];
-        }
-    }
-
-    for (int round = 1; round <= 8; round++){
-        unsigned char col[4];
-
-        for (int i = 0; i < 4;i++){
-            col[i] = expandedKey[round - 1][i][5];
-        }
-
-        unsigned char temp = col[0];
-
-        for (int i = 0; i < 3;i++){
-            col[i] = col[i+1];
-        }
-
-        col[3] = temp;
-
-        for (int i = 0; i < 4;i++){
-            col[i] = sBox[col[i]];
-        }
-
-        col[0] = col[0] ^ rc[round - 1];
-
-        for (int i = 0; i < 4;i++){
-            expandedKey[round][i][0] = expandedKey[round-1][i][0] ^ col[i];
-        }
-
-        for (int j = 1; j < 6;j++){
-            for (int i = 0; i < 4;i++){
-                expandedKey[round][i][j] = expandedKey[round][i][j-1] ^ expandedKey[round - 1][i][j];
+    void KeyConversion(unsigned char expandedKey[9][4][6],unsigned char finalKey[13][4][4]){
+        for (int key = 0; key < 13;key++){
+            for (int j = 0; j < 4;j++){
+                int num = key * 4 + j;
+                int row = num/6;
+                int col = num % 6;
+                for (int i = 0; i < 4;i++){
+                    finalKey[key][i][j] = expandedKey[row][i][col];
+                }
             }
+
         }
     }
 
-}
 
-void Encryption192(unsigned char primaryMatrix[4][4], unsigned char expandedKeys[13][4][4]){
-        AES_Operations::AddRoundKey(primaryMatrix,expandedKeys[0]);
 
-        for (int i = 1; i <= 11;i++){
-            AES_Operations::Round(primaryMatrix,expandedKeys[i]);
+    void Encryption192(unsigned char primaryMatrix[4][4], unsigned char expandedKeys[13][4][4]){
+            AES_Operations::AddRoundKey(primaryMatrix,expandedKeys[0]);
+
+            for (int i = 1; i <= 11;i++){
+                AES_Operations::Round(primaryMatrix,expandedKeys[i]);
+            }
+
+            AES_Operations::LastRound(primaryMatrix,expandedKeys[12]);
+
+    } 
+
+    void Encrypt() {
+        unsigned char key[24];
+        unsigned char primary[16];
+
+        unsigned char primaryMatrix[4][4];
+        unsigned char keyMatrix[4][6];
+        
+        // Get hexaPrimary and hexaKey values
+        char* hexaPrimary = getHexaPrimary();
+        char* hexaKey = getHexaKey();
+
+        HexaArrayToByteArray(primary,hexaPrimary);
+        ByteArrayToByteMatrix(primaryMatrix,primary);
+
+        HexaArrayToByteArray2(key,hexaKey);
+
+        ByteArrayToByteMatrix2(keyMatrix,key);
+
+
+        unsigned char expandedKey[9][4][6];
+        unsigned char finalKey[13][4][4];
+
+        KeyExpansion192(expandedKey,keyMatrix);
+        KeyConversion(expandedKey,finalKey);
+
+        Encryption192(primaryMatrix,finalKey);
+
+        ByteMatrixToByteArray(primaryMatrix,primary);
+        ByteArrayToHexaArray(primary,hexaPrimary);
+
+        ByteMatrixToByteArray2(key,expandedKey[8]);
+        ByteArrayToHexaArray2(hexaKey,key);
+
+
+        for (int i = 0; i < 32;i++){
+            cout << hexaPrimary[i];
         }
+    }
+};
 
-        AES_Operations::LastRound(primaryMatrix,expandedKeys[12]);
 
-}   
+
+
+  
 int main(){
 
-    char hexaPrimary[33] = "00112233445566778899aabbccddeeff";
-    char hexaKey[49] = "000102030405060708090a0b0c0d0e0f1011121314151617";
+    const char* hexaPrimary = "00112233445566778899aabbccddeeff";
+    const char* hexaKey = "000102030405060708090a0b0c0d0e0f";
 
-    unsigned char key[24];
-    unsigned char primary[16];
+    int length = strlen(hexaKey);
 
-    unsigned char primaryMatrix[4][4];
-    unsigned char keyMatrix[4][6];
+    if (length == 48){
+        AES192_Encryption aes(hexaPrimary,hexaKey);
 
-    HexaArrayToByteArray(primary,hexaPrimary);
-    ByteArrayToByteMatrix(primaryMatrix,primary);
+        cout << "Encrypted Text: ";
+        aes.Encrypt();
 
-    HexaArrayToByteArray2(key,hexaKey);
-
-    ByteArrayToByteMatrix2(keyMatrix,key);
-
-
-    unsigned char expandedKey[9][4][6];
-    unsigned char finalKey[13][4][4];
-
-    KeyExpansion192(expandedKey,keyMatrix);
-    KeyConversion(expandedKey,finalKey);
-
-    Encryption192(primaryMatrix,finalKey);
-
-    ByteMatrixToByteArray(primaryMatrix,primary);
-    ByteArrayToHexaArray(primary,hexaPrimary);
-
-    ByteMatrixToByteArray2(key,expandedKey[8]);
-    ByteArrayToHexaArray2(hexaKey,key);
-
-
-    for (int i = 0; i < 32;i++){
-        cout << hexaPrimary[i];
     }
 
-    cout << endl;
-
-    for (int i = 0; i < 48;i++){
-        cout << hexaKey[i];
+    else if (length == 32){
+        AES128_Encryption aes(hexaPrimary,hexaKey);
+        cout << "Encrypted Text: ";
+        aes.Encrypt();
     }
+
+    else{
+        cout << "Please enter a valid key\n";
+    }
+
 
     return 0;
 }

@@ -380,23 +380,24 @@ public:
 
 
 int main(){
-    const char* hexaCipher = "dda97ca4864cdfe06eaf70a0ec0d7191";
-    const char* hexaKey = "a4970a331a78dc09c418c271e3a41d5d41879d5299294760";
+    const char* hexaCipher = "69c4e0d86a7b0430d8cdb78070b4c55a";
+    const char* hexaKey = "13111d7fe3944a17f307a78b4d2b30c5";
     int length = strlen(hexaKey);
 
     if (length == 48){
         AES192_Decryption aes(hexaCipher,hexaKey);
-
+        cout << "Decrypted Text: ";
         aes.Decrypt();
     }
 
     else if (length == 32){
         AES128_Decryption aes(hexaCipher,hexaKey);
+        cout << "Decrypted Text: ";
         aes.Decrypt();
     }
 
     else{
-        cout << "Please enter a key of valid length\n";
+        cout << "Please enter a valid key\n";
     }
 
 
