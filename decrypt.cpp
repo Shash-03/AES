@@ -237,14 +237,167 @@ public:
 
 };
 
+class AES192_Decryption{
+private:
+    char hexaCipher[33];
+    char hexaKey[49];
+
+public:
+
+    AES192_Decryption(const char *cipher, const char *key){
+        setHexaCipher(cipher);
+        setHexaKey(key);
+    }
+
+    char* getHexaCipher() {
+        return hexaCipher;
+    }
+
+   
+    void setHexaCipher(const char* value) {
+        strncpy(hexaCipher, value, 32);
+        hexaCipher[32] = '\0'; 
+    }
+
+    char* getHexaKey() {
+        return hexaKey;
+    }
+
+   
+    void setHexaKey(const char* value) {
+        strncpy(hexaKey, value, 48);
+        hexaKey[48] = '\0';
+    }
+
+
+    void KeyExpansion192(unsigned char expandedKeys[9][4][6],unsigned char keyMatrix[4][6]){
+        for (int j = 0; j < 6;j++){
+            for (int i = 0; i < 4;i++){
+                expandedKeys[0][i][j] = keyMatrix[i][j];
+            }
+        }
+
+        for (int round = 1; round <= 8; round++) {
+            //We can simply find w5,w6,w7 by w0 ^ w1 and so on
+            for (int j = 5; j >= 1 ; j--){
+
+                for (int i = 0; i < 4;i++){
+                    expandedKeys[round][i][j] = expandedKeys[round - 1][i][j-1] ^ expandedKeys[round - 1][i][j];
+                }
+            }
+
+            //To find w4, we take g(w3) ^ w0
+            unsigned char col[4];
+
+            for (int i = 0; i < 4;i++){
+                col[i] = expandedKeys[round - 1][i][4] ^ expandedKeys[round - 1][i][5];
+            }
+            
+            unsigned char temp = col[0];
+            for (int i = 0; i < 3; i++) {
+                col[i] = col[i + 1];
+            }
+            col[3] = temp;
+
+            for (int i = 0; i < 4; i++) {
+                col[i] = sBox[col[i]];
+            }
+
+            col[0] ^= rc[8 - round];
+
+            for (int i = 0; i < 4;i++){
+                expandedKeys[round][i][0] = col[i] ^ expandedKeys[round - 1][i][0];
+            }
+
+        }
+
+    }
+
+    void KeyConversion(unsigned char expandedKeys[9][4][6],unsigned char finalKey[13][4][4]){
+        for (int key = 0; key < 13;key++){
+            for (int j = 0; j < 4;j++){
+                int num = 2 + 4 * key + (3 - j);
+                int row = num/6;
+                int col = 5 - num % 6;
+                for (int i = 0; i < 4;i++){
+                    finalKey[key][i][j] = expandedKeys[row][i][col];
+                }
+            }
+
+        } //Offset 2 start counting from right
+
+    }
+
+
+    void Decryption192(unsigned char cipherMatrix[4][4], unsigned char finalKey[13][4][4]){
+        AES_Operations::AddRoundKey(cipherMatrix,finalKey[0]);
+
+        for (int i = 1; i <= 11 ;i++){
+            AES_Operations::Round(cipherMatrix,finalKey[i]);
+        }
+
+        AES_Operations::LastRound(cipherMatrix,finalKey[12]);
+    }
+
+    void Decrypt(){
+
+        unsigned char key[24];
+        unsigned char cipher[16];
+
+        unsigned char cipherMatrix[4][4];
+        unsigned char keyMatrix[4][6];
+
+        char* hexaCipher = getHexaCipher();
+        char* hexaKey = getHexaKey();
+
+        HexaArrayToByteArray(cipher,hexaCipher);
+        ByteArrayToByteMatrix(cipherMatrix,cipher);
+
+        HexaArrayToByteArray2(key,hexaKey);
+
+        ByteArrayToByteMatrix2(keyMatrix,key);
+    
+        unsigned char expandedKeys[9][4][6];
+        unsigned char finalKey[13][4][4];
+
+        KeyExpansion192(expandedKeys,keyMatrix);
+
+        KeyConversion(expandedKeys,finalKey);
+
+        Decryption192(cipherMatrix,finalKey);
+
+        ByteMatrixToByteArray(cipherMatrix,cipher);
+        ByteArrayToHexaArray(cipher,hexaCipher);
+
+        for (int i = 0; i < 32;i++){
+            cout << hexaCipher[i] ;
+        }
+
+    }
+
+};
+
+
 
 int main(){
-    const char* hexaCipher = "69c4e0d86a7b0430d8cdb78070b4c55a";
-    const char* hexaKey = "13111d7fe3944a17f307a78b4d2b30c5";
+    const char* hexaCipher = "dda97ca4864cdfe06eaf70a0ec0d7191";
+    const char* hexaKey = "a4970a331a78dc09c418c271e3a41d5d41879d5299294760";
+    int length = strlen(hexaKey);
 
-    AES128_Decryption aes128(hexaCipher,hexaKey);
+    if (length == 48){
+        AES192_Decryption aes(hexaCipher,hexaKey);
 
-    aes128.Decrypt();
+        aes.Decrypt();
+    }
+
+    else if (length == 32){
+        AES128_Decryption aes(hexaCipher,hexaKey);
+        aes.Decrypt();
+    }
+
+    else{
+        cout << "Please enter a key of valid length\n";
+    }
 
 
     return 0;

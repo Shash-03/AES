@@ -318,16 +318,19 @@ int main(){
     ByteMatrixToByteArray(primaryMatrix,primary);
     ByteArrayToHexaArray(primary,hexaPrimary);
 
+    ByteMatrixToByteArray2(key,expandedKey[8]);
+    ByteArrayToHexaArray2(hexaKey,key);
+
 
     for (int i = 0; i < 32;i++){
         cout << hexaPrimary[i];
     }
 
+    cout << endl;
 
-
-
-
-
+    for (int i = 0; i < 48;i++){
+        cout << hexaKey[i];
+    }
 
     return 0;
 }
