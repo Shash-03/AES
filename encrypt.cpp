@@ -223,22 +223,110 @@ public:
     }
 };
 
+void KeyConversion(unsigned char expandedKey[9][4][6],unsigned char finalKey[13][4][4]){
+    for (int key = 0; key < 13;key++){
+        for (int j = 0; j < 4;j++){
+            int num = key * 4 + j;
+            int row = num/6;
+            int col = num % 6;
+            for (int i = 0; i < 4;i++){
+                finalKey[key][i][j] = expandedKey[row][i][col];
+            }
+        }
 
+    }
+}
 
+void KeyExpansion192(unsigned char expandedKey[9][4][6],unsigned char keyMatrix[4][6]){
+    for (int j = 0; j < 6;j++){
+        for (int i = 0; i < 4;i++){
+            expandedKey[0][i][j] = keyMatrix[i][j];
+        }
+    }
 
+    for (int round = 1; round <= 8; round++){
+        unsigned char col[4];
 
+        for (int i = 0; i < 4;i++){
+            col[i] = expandedKey[round - 1][i][5];
+        }
 
+        unsigned char temp = col[0];
 
+        for (int i = 0; i < 3;i++){
+            col[i] = col[i+1];
+        }
 
+        col[3] = temp;
+
+        for (int i = 0; i < 4;i++){
+            col[i] = sBox[col[i]];
+        }
+
+        col[0] = col[0] ^ rc[round - 1];
+
+        for (int i = 0; i < 4;i++){
+            expandedKey[round][i][0] = expandedKey[round-1][i][0] ^ col[i];
+        }
+
+        for (int j = 1; j < 6;j++){
+            for (int i = 0; i < 4;i++){
+                expandedKey[round][i][j] = expandedKey[round][i][j-1] ^ expandedKey[round - 1][i][j];
+            }
+        }
+    }
+
+}
+
+void Encryption192(unsigned char primaryMatrix[4][4], unsigned char expandedKeys[13][4][4]){
+        AES_Operations::AddRoundKey(primaryMatrix,expandedKeys[0]);
+
+        for (int i = 1; i <= 11;i++){
+            AES_Operations::Round(primaryMatrix,expandedKeys[i]);
+        }
+
+        AES_Operations::LastRound(primaryMatrix,expandedKeys[12]);
+
+}   
 int main(){
 
-    const char* hexaPrimary = "00112233445566778899aabbccddeeff";
+    char hexaPrimary[33] = "00112233445566778899aabbccddeeff";
+    char hexaKey[49] = "000102030405060708090a0b0c0d0e0f1011121314151617";
 
-    const char* hexaKey = "000102030405060708090a0b0c0d0e0f";
+    unsigned char key[24];
+    unsigned char primary[16];
 
-    AES128_Encryption aes128(hexaPrimary,hexaKey);
+    unsigned char primaryMatrix[4][4];
+    unsigned char keyMatrix[4][6];
 
-    aes128.Encrypt();
+    HexaArrayToByteArray(primary,hexaPrimary);
+    ByteArrayToByteMatrix(primaryMatrix,primary);
+
+    HexaArrayToByteArray2(key,hexaKey);
+
+    ByteArrayToByteMatrix2(keyMatrix,key);
+
+
+    unsigned char expandedKey[9][4][6];
+    unsigned char finalKey[13][4][4];
+
+    KeyExpansion192(expandedKey,keyMatrix);
+    KeyConversion(expandedKey,finalKey);
+
+    Encryption192(primaryMatrix,finalKey);
+
+    ByteMatrixToByteArray(primaryMatrix,primary);
+    ByteArrayToHexaArray(primary,hexaPrimary);
+
+
+    for (int i = 0; i < 32;i++){
+        cout << hexaPrimary[i];
+    }
+
+
+
+
+
 
 
     return 0;
