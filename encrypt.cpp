@@ -364,35 +364,156 @@ public:
     }
 };
 
+void HexaArrayToByteArray3(unsigned char key[32],char hexaKey[65]){
+    for (int i = 0; i < 32;i++){
+        int first = HexaToInt(hexaKey[2*i]);
+        int second = HexaToInt(hexaKey[2*i+1]);
+        key[i] = (unsigned char)((first << 4) + second);
+    }
+
+
+}
 
 
 
+void ByteArrayToByteMatrix3(unsigned char keyMatrix[4][8],unsigned char key[32]){
+
+    int ind = 0;
+
+    for (int j = 0; j < 8;j++){
+        for (int i = 0; i < 4;i++){
+            keyMatrix[i][j] = key[ind++];
+        }
+    }
+
+}
+
+void ByteMatrixToByteArray3( unsigned char keyMatrix[4][8],unsigned char key[32]){
+    int ind = 0;
+    for (int j = 0; j < 8;j++){
+        for (int i = 0; i < 4;i++){
+            key[ind++] = keyMatrix[i][j];
+        }
+    }   
+}
+
+
+void ByteArrayToHexaArray3(unsigned char key[32],char hexaKey[65]){
+    for (int i = 0; i < 32;i++){
+        int number = key[i];
+
+        int first = number / 16;
+        int second = number % 16;
+
+        char a = IntToHexa(first);
+        char b = IntToHexa(second);
+
+        hexaKey[2*i] = a;
+        hexaKey[2*i+1] = b;
+    }   
+
+}
   
 int main(){
 
-    const char* hexaPrimary = "00112233445566778899aabbccddeeff";
-    const char* hexaKey = "000102030405060708090a0b0c0d0e0f";
+    unsigned char key[32];
+    unsigned char primary[16];
 
-    int length = strlen(hexaKey);
+    unsigned char primaryMatrix[4][4];
+    unsigned char keyMatrix[4][8];
+    
+    char hexaKey[65] = "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f";
+    char hexaPrimary[33] = "00112233445566778899aabbccddeeff";
 
-    if (length == 48){
-        AES192_Encryption aes(hexaPrimary,hexaKey);
+    HexaArrayToByteArray(primary,hexaPrimary);
+    ByteArrayToByteMatrix(primaryMatrix,primary);
 
-        cout << "Encrypted Text: ";
-        aes.Encrypt();
+    HexaArrayToByteArray3(key,hexaKey);
+    ByteArrayToByteMatrix3(keyMatrix,key);
+
+    unsigned char expandedKey[8][4][8];
+    unsigned char finalKey[15][4][4];
+
+    for (int j = 0; j < 8;j++){
+        for (int i = 0; i < 4;i++){
+            expandedKey[0][i][j] = keyMatrix[i][j];
+        }
+    }
+
+    for (int round = 1; round <= 7; round++){
+        unsigned char col[4];
+
+        for (int i = 0; i < 4;i++){
+            col[i] = expandedKey[round - 1][i][7];
+        }
+
+        unsigned char temp = col[0];
+
+        for (int i = 0; i < 3;i++){
+            col[i] = col[i+1];
+        }
+
+        col[3] = temp;
+
+        for (int i = 0; i < 4;i++){
+            col[i] = sBox[col[i]];
+        }
+
+        col[0] = col[0] ^ rc[round - 1];
+
+        for (int i = 0; i < 4;i++){
+            expandedKey[round][i][0] = expandedKey[round-1][i][0] ^ col[i];
+        }
+
+        for (int j = 1; j < 8;j++){
+            for (int i = 0; i < 4;i++){
+                if (j != 4){
+                    expandedKey[round][i][j] = expandedKey[round][i][j-1] ^ expandedKey[round - 1][i][j];
+
+                }
+                else{
+                    expandedKey[round][i][j] = sBox[expandedKey[round][i][j-1]] ^ expandedKey[round - 1][i][j];
+
+                }
+                
+            }
+        }
+    }
+
+    for (int key = 0; key < 15;key++){
+        for (int j = 0; j < 4;j++){
+            int row = key/2;
+            int col;
+            if (key % 2 == 0){
+                col = j;
+            }
+            else{
+                col = 4 + j;
+            }
+            for (int i = 0; i < 4;i++){
+                finalKey[key][i][j] = expandedKey[row][i][col];
+            }
+        }
 
     }
 
-    else if (length == 32){
-        AES128_Encryption aes(hexaPrimary,hexaKey);
-        cout << "Encrypted Text: ";
-        aes.Encrypt();
+    AES_Operations::AddRoundKey(primaryMatrix,finalKey[0]);
+
+    for (int i = 1; i <= 13;i++){
+        AES_Operations::Round(primaryMatrix,finalKey[i]);
     }
 
-    else{
-        cout << "Please enter a valid key\n";
+    AES_Operations::LastRound(primaryMatrix,finalKey[14]);
+
+    ByteMatrixToByteArray(primaryMatrix,primary);
+    ByteArrayToHexaArray(primary,hexaPrimary);
+    
+
+    for (int i = 0; i < 32;i++){
+        cout << hexaPrimary[i];
     }
 
+    cout << endl;
 
     return 0;
 }
