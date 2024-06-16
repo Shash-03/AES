@@ -168,3 +168,53 @@ void ByteArrayToHexaArray2(char hexaKey[49],unsigned char key[24]){
     }   
 
 }
+
+void HexaArrayToByteArray3(unsigned char key[32],char hexaKey[65]){
+    for (int i = 0; i < 32;i++){
+        int first = HexaToInt(hexaKey[2*i]);
+        int second = HexaToInt(hexaKey[2*i+1]);
+        key[i] = (unsigned char)((first << 4) + second);
+    }
+
+
+}
+
+
+
+void ByteArrayToByteMatrix3(unsigned char keyMatrix[4][8],unsigned char key[32]){
+
+    int ind = 0;
+
+    for (int j = 0; j < 8;j++){
+        for (int i = 0; i < 4;i++){
+            keyMatrix[i][j] = key[ind++];
+        }
+    }
+
+}
+
+void ByteMatrixToByteArray3( unsigned char keyMatrix[4][8],unsigned char key[32]){
+    int ind = 0;
+    for (int j = 0; j < 8;j++){
+        for (int i = 0; i < 4;i++){
+            key[ind++] = keyMatrix[i][j];
+        }
+    }   
+}
+
+
+void ByteArrayToHexaArray3(unsigned char key[32],char hexaKey[65]){
+    for (int i = 0; i < 32;i++){
+        int number = key[i];
+
+        int first = number / 16;
+        int second = number % 16;
+
+        char a = IntToHexa(first);
+        char b = IntToHexa(second);
+
+        hexaKey[2*i] = a;
+        hexaKey[2*i+1] = b;
+    }   
+
+}

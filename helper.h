@@ -25,5 +25,12 @@ void ByteMatrixToByteArray2(unsigned char key[24],unsigned char keyMatrix[4][6])
 
 void ByteArrayToHexaArray2(char hexaKey[49],unsigned char key[24]);
 
+void HexaArrayToByteArray3(unsigned char key[32],char hexaKey[65]);
+
+void ByteArrayToByteMatrix3(unsigned char keyMatrix[4][8],unsigned char key[32]);
+
+void ByteMatrixToByteArray3( unsigned char keyMatrix[4][8],unsigned char key[32]);
+
+void ByteArrayToHexaArray3(unsigned char key[32],char hexaKey[65]);
 
 #endif
