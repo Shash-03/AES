@@ -376,152 +376,162 @@ public:
     }
 
 };
-void HexaArrayToByteArray3(unsigned char key[32],char hexaKey[65]){
-    for (int i = 0; i < 32;i++){
-        int first = HexaToInt(hexaKey[2*i]);
-        int second = HexaToInt(hexaKey[2*i+1]);
-        key[i] = (unsigned char)((first << 4) + second);
+
+class AES256_Decryption{
+private:
+    char hexaCipher[33];
+    char hexaKey[65];
+
+public:
+
+    AES256_Decryption(const char *cipher, const char *key){
+        setHexaCipher(cipher);
+        setHexaKey(key);
+    }
+
+    char* getHexaCipher() {
+        return hexaCipher;
+    }
+
+   
+    void setHexaCipher(const char* value) {
+        strncpy(hexaCipher, value, 32);
+        hexaCipher[32] = '\0'; 
+    }
+
+    char* getHexaKey() {
+        return hexaKey;
+    }
+
+   
+    void setHexaKey(const char* value) {
+        strncpy(hexaKey, value, 64);
+        hexaKey[64] = '\0';
     }
 
 
-}
-
-
-
-void ByteArrayToByteMatrix3(unsigned char keyMatrix[4][8],unsigned char key[32]){
-
-    int ind = 0;
-
-    for (int j = 0; j < 8;j++){
-        for (int i = 0; i < 4;i++){
-            keyMatrix[i][j] = key[ind++];
+    void KeyExpansion256(unsigned char expandedKeys[8][4][8],unsigned char keyMatrix[4][8]){
+        for (int j = 0; j < 8;j++){
+            for (int i = 0; i < 4;i++){
+                expandedKeys[0][i][j] = keyMatrix[i][j];
+            }
         }
+
+        for (int round = 1; round <= 7; round++) {
+            //We can simply find w5,w6,w7 by w0 ^ w1 and so on
+            for (int j = 7; j >= 1 ; j--){
+                if (j != 4){
+        
+                    for (int i = 0; i < 4;i++){
+                        expandedKeys[round][i][j] = expandedKeys[round - 1][i][j-1] ^ expandedKeys[round - 1][i][j];
+                    }
+
+                }
+
+                else{
+                    for (int i = 0; i < 4;i++){
+                        expandedKeys[round][i][j] = expandedKeys[round - 1][i][j] ^ sBox[expandedKeys[round - 1][i][j-1]];
+                    }
+                }
+
+            }
+
+            //To find w4, we take g(w3) ^ w0
+            unsigned char col[4];
+
+            for (int i = 0; i < 4;i++){
+                col[i] = expandedKeys[round - 1][i][6] ^ expandedKeys[round - 1][i][7];
+            }
+            
+            unsigned char temp = col[0];
+            for (int i = 0; i < 3; i++) {
+                col[i] = col[i + 1];
+            }
+            col[3] = temp;
+
+            for (int i = 0; i < 4; i++) {
+                col[i] = sBox[col[i]];
+            }
+
+            col[0] ^= rc[7 - round];
+
+            for (int i = 0; i < 4;i++){
+                expandedKeys[round][i][0] = col[i] ^ expandedKeys[round - 1][i][0];
+            }
+        }
+
     }
 
-}
+    void KeyConversion(unsigned char expandedKeys[8][4][8],unsigned char finalKey[15][4][4]){
+        for (int key = 0; key < 15;key++){
+            for (int j = 0; j < 4;j++){
+                int num = 4 + 4 * key + (3 - j);
+                int row = num/8;
+                int col = 7 - num % 8;
+                for (int i = 0; i < 4;i++){
+                    finalKey[key][i][j] = expandedKeys[row][i][col];
+                }
+            }
 
-void ByteMatrixToByteArray3( unsigned char keyMatrix[4][8],unsigned char key[32]){
-    int ind = 0;
-    for (int j = 0; j < 8;j++){
-        for (int i = 0; i < 4;i++){
-            key[ind++] = keyMatrix[i][j];
+        } 
+
+    }
+
+
+    void Decryption256(unsigned char cipherMatrix[4][4], unsigned char finalKey[15][4][4]){
+        AES_Operations::AddRoundKey(cipherMatrix,finalKey[0]);
+
+        for (int i = 1; i <= 13 ;i++){
+            AES_Operations::Round(cipherMatrix,finalKey[i]);
         }
-    }   
-}
+
+        AES_Operations::LastRound(cipherMatrix,finalKey[14]);
+    }
+
+    void Decrypt(){
+
+        unsigned char key[32];
+        unsigned char cipher[16];
+
+        unsigned char cipherMatrix[4][4];
+        unsigned char keyMatrix[4][8];
+        unsigned char expandedKeys[8][4][8];
+        unsigned char finalKey[15][4][4];
+
+        char* hexaCipher = getHexaCipher();
+        char* hexaKey = getHexaKey();
+
+        HexaArrayToByteArray(cipher,hexaCipher);
+        ByteArrayToByteMatrix(cipherMatrix,cipher);
+
+        HexaArrayToByteArray3(key,hexaKey);
+
+        ByteArrayToByteMatrix3(keyMatrix,key);
 
 
-void ByteArrayToHexaArray3(unsigned char key[32],char hexaKey[65]){
-    for (int i = 0; i < 32;i++){
-        int number = key[i];
+        KeyExpansion256(expandedKeys,keyMatrix);
 
-        int first = number / 16;
-        int second = number % 16;
+        KeyConversion(expandedKeys,finalKey);
 
-        char a = IntToHexa(first);
-        char b = IntToHexa(second);
+        Decryption256(cipherMatrix,finalKey);
 
-        hexaKey[2*i] = a;
-        hexaKey[2*i+1] = b;
-    }   
+        ByteMatrixToByteArray(cipherMatrix,cipher);
+        ByteArrayToHexaArray(cipher,hexaCipher);
 
-}
+        for (int i = 0; i < 32;i++){
+            cout << hexaCipher[i];
+        }
 
+    }
+
+};
 
 int main(){
-    unsigned char key[32];
-    unsigned char cipher[16];
 
-    unsigned char cipherMatrix[4][4];
-    unsigned char keyMatrix[4][8];
     
-    char hexaKey[65] = "24fc79ccbf0979e9371ac23c6d68de36721f7b9cdbed347ca5ba1fd66842d23c";
-    char hexaCipher[33] = "8ea2b7ca516745bfeafc49904b496089";
-
-    HexaArrayToByteArray(cipher,hexaCipher);
-    ByteArrayToByteMatrix(cipherMatrix,cipher);
-
-    HexaArrayToByteArray3(key,hexaKey);
-    ByteArrayToByteMatrix3(keyMatrix,key);
-    unsigned char expandedKeys[8][4][8];
-    unsigned char finalKey[15][4][4];
-
-    for (int j = 0; j < 8;j++){
-        for (int i = 0; i < 4;i++){
-            expandedKeys[0][i][j] = keyMatrix[i][j];
-        }
-    }
-
-    for (int round = 1; round <= 7; round++) {
-        //We can simply find w5,w6,w7 by w0 ^ w1 and so on
-        for (int j = 7; j >= 1 ; j--){
-            if (j != 4){
     
-                for (int i = 0; i < 4;i++){
-                    expandedKeys[round][i][j] = expandedKeys[round - 1][i][j-1] ^ expandedKeys[round - 1][i][j];
-                }
-
-            }
-
-            else{
-                for (int i = 0; i < 4;i++){
-                    expandedKeys[round][i][j] = expandedKeys[round - 1][i][j] ^ sBox[expandedKeys[round - 1][i][j-1]];
-                }
-            }
-
-        }
-
-        //To find w4, we take g(w3) ^ w0
-        unsigned char col[4];
-
-        for (int i = 0; i < 4;i++){
-            col[i] = expandedKeys[round - 1][i][6] ^ expandedKeys[round - 1][i][7];
-        }
-        
-        unsigned char temp = col[0];
-        for (int i = 0; i < 3; i++) {
-            col[i] = col[i + 1];
-        }
-        col[3] = temp;
-
-        for (int i = 0; i < 4; i++) {
-            col[i] = sBox[col[i]];
-        }
-
-        col[0] ^= rc[7 - round];
-
-        for (int i = 0; i < 4;i++){
-            expandedKeys[round][i][0] = col[i] ^ expandedKeys[round - 1][i][0];
-        }
-    }
-
-    for (int key = 0; key < 15;key++){
-        for (int j = 0; j < 4;j++){
-            int num = 4 + 4 * key + (3 - j);
-            int row = num/8;
-            int col = 7 - num % 8;
-            for (int i = 0; i < 4;i++){
-                finalKey[key][i][j] = expandedKeys[row][i][col];
-            }
-        }
-
-    }
-
-    AES_Operations::AddRoundKey(cipherMatrix,finalKey[0]);
-
-    for (int i = 1; i <= 13 ;i++){
-        AES_Operations::Round(cipherMatrix,finalKey[i]);
-    }
-
-    AES_Operations::LastRound(cipherMatrix,finalKey[14]);
 
 
-
-    ByteMatrixToByteArray(cipherMatrix,cipher);
-    ByteArrayToHexaArray(cipher,hexaCipher);
-
-    for (int i = 0; i < 32;i++){
-        cout << hexaCipher[i];
-    }
 
 
     return 0;
